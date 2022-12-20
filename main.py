@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
@@ -10,7 +11,7 @@ from glob import glob
 
 import jinja2
 
-from config import PreprocessingInterp, Config
+from config import Config
 from processor import LoaderDispatcher, AcceptAllProcessor, \
     PurchasePartsProcessor
 from part import Part
@@ -20,18 +21,39 @@ logging.basicConfig(format=FORMAT)
 logger = logging.getLogger('doc_compiler')
 logger.setLevel(logging.DEBUG)
 
-parser = ArgumentParser()
-parser.add_argument("-c", "--config", help="load configuration file from disk", default='./config.ini')
-args = parser.parse_args()
 
-parser = ConfigParser(interpolation=PreprocessingInterp({
-    'regex': lambda x: re.compile(x, re.IGNORECASE)
-    }
-))
-parser.read(args.config)
-config = Config(**dict(
-    sum([list(parser[x].items()) for x in parser.sections()], [])
-))
+parser = ArgumentParser()
+parser.add_argument(
+    "--sw_project", help="path to project directory of Solidworks project",
+    default='~/Documents/GrabCAD/VTOL-mugin', dest='project_path', type=os.path.expanduser)
+parser.add_argument(
+    "--bom_file", help="path to bom file", type=os.path.expanduser,
+    default='~/Documents/GrabCAD/VTOL-mugin/out.json', dest='bom_json')
+parser.add_argument(
+    "--templates", help="path to template folder", type=os.path.expanduser,
+    default='~/Documents/GrabCAD/VTOL-mugin/Template', dest='templates_folder')
+parser.add_argument(
+    "--part_name_metadata", help="field with part name in bom data",
+    default='ОБОЗНАЧЕНИЕ', dest='part_name_in_meta')
+parser.add_argument(
+    "--part_id_metadata", help="field with part identification number in metadata",
+    default='ПОЗ-я', dest='part_id_in_meta')
+parser.add_argument(
+    "--out", help="field with part identification number in metadata",
+    default='./docs', dest='out_path')
+parser.add_argument(
+    "--docs_folder", help="name of folder with markdown files that describe each part",
+    default='docs', dest='docs_folder')
+
+args = vars(parser.parse_args())
+config = Config(
+    **args,
+    image_pattern=re.compile('.+\\.((PNG)|(JPG)|(JPEG))', re.IGNORECASE),
+    template_pattern=re.compile('.+\\.MD', re.IGNORECASE),
+    sw_file_pattern=re.compile('.+\\.((SLDPRT)|(SLDASM))', re.IGNORECASE),
+    part_id_pattern=re.compile('VTOL\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}'),
+    human_readable_name_pattern=re.compile('[^-]+ +- +')
+)
 
 
 try:

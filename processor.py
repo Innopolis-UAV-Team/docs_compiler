@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import shutil
+import urllib
 from typing import Union, List, Dict, Optional, Tuple
 
 import jinja2
@@ -90,7 +91,7 @@ class AcceptAllProcessor(JinjaLoggedProcessor):
         self.template_text = template.render(
             part_name=part.human_readable_name,
             part_info=str(part.metadata),
-            images=image_files,
+            images=[urllib.parse.quote(x) for x in image_files],
             children=part.children,
         )
 
@@ -102,7 +103,8 @@ class AcceptAllProcessor(JinjaLoggedProcessor):
             f.write(self.template_text)
         for image_file in image_files:
             shutil.copy(
-                os.path.join(path, self.config.docs_folder, image_file), path)
+                os.path.join(part.path, self.config.docs_folder, image_file),
+                os.path.join(path, urllib.parse.quote(image_file)))
 
 
 class PurchasePartsProcessor(JinjaLoggedProcessor):
