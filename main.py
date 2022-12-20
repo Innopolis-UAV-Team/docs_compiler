@@ -1,19 +1,18 @@
 from __future__ import annotations
+
 import json
+import logging
 import os
 import re
-from dataclasses import dataclass, Field, field
+from argparse import ArgumentParser
+from configparser import ConfigParser
 from glob import glob
-import logging
-from typing import List, Dict
-import shutil
 
 import jinja2
-from jinja2 import TemplateNotFound
-from config import Config
-from argparse import ArgumentParser
 
-from loaders.loader import LoaderDispatcher, AcceptAllLoader
+from config import PreprocessingInterp, Config
+from processor import LoaderDispatcher, AcceptAllProcessor, \
+    PurchasePartsProcessor
 from part import Part
 
 FORMAT = '[%(levelname)s] %(asctime)s : %(message)s'
@@ -22,15 +21,21 @@ logger = logging.getLogger('doc_compiler')
 logger.setLevel(logging.DEBUG)
 
 parser = ArgumentParser()
-parser.add_argument("-c", "--config", help="load configuration file from disk", default='./config.json')
+parser.add_argument("-c", "--config", help="load configuration file from disk", default='./config.ini')
 args = parser.parse_args()
-with open(args.config, encoding='utf-8') as f:
-    config = json.load(f)
-    config = Config(**config)
+
+parser = ConfigParser(interpolation=PreprocessingInterp({
+    'regex': lambda x: re.compile(x, re.IGNORECASE)
+    }
+))
+parser.read(args.config)
+config = Config(**dict(
+    sum([list(parser[x].items()) for x in parser.sections()], [])
+))
 
 
 try:
-    os.mkdir(config.out_folder)
+    os.mkdir(config.out_path)
 except FileExistsError:
     pass
 
@@ -39,7 +44,7 @@ with open(config.bom_json, encoding='utf-8') as f:
     # Use Solid-generated bom part id instead of one of form VTOL.something.something.something
     # because this list contains duplicates - parts used in various assys
     parsed_structure = {
-        (bom_part_id := x.pop(config.part_no_in_meta)): Part(
+        (bom_part_id := x.pop(config.part_id_in_meta)): Part(
             full_name=(full_name := x.pop(config.part_name_in_meta).strip()),
             human_readable_name=config.human_readable_name_pattern.sub('', full_name),
             part_id=match.group() if (match := config.part_id_pattern.match(full_name)) else full_name,
@@ -61,9 +66,7 @@ while queue:
     item = queue.pop()
     children = [v for k, v in item.items() if k != 'part']
     f = [x['part'] for x in children]
-    item['part'].children = f
-    for part in item['part'].children:
-        part.parent = item['part']
+    item['part'].add_children(f)
     queue += children
 
 # We no longer care about duplicates since the tree has already been built
@@ -100,14 +103,14 @@ if missing_in_fs := [k for k, v in parsed_structure.items() if not v.path]:
         f'but not in file system: {", ".join(missing_in_fs)}')
     logger.warning(f'Virtual parts?')
 
-tree = Part(
+part_tree = Part(
     full_name='VTOL.000.00.000 - Общая сборка.SLDASM',
     human_readable_name='Общая сборка.SLDASM',
     part_id='VTOL.000.00.000',
     bom_part_id='',
-    children=[v['part'] for k, v in tree.items() if k != 'part'],
-    path=config.out_folder
+    path=config.out_path
 )
+part_tree.add_children([v['part'] for k, v in tree.items() if k != 'part'])
 
 
 paths = set(v.path for k, v in parsed_structure.items() if v.path)
@@ -121,10 +124,12 @@ env = jinja2.Environment(
 
 env.trim_blocks = True
 env.lstrip_blocks = True
+env.filters['zip'] = zip
 visited = set()
 
 dispatcher = LoaderDispatcher().\
-    register(AcceptAllLoader(env, config))
+    register(PurchasePartsProcessor(env, config, fallthrough=True)).\
+    register(AcceptAllProcessor(env, config))
 
 for doc_dir in paths:
     files = os.listdir(doc_dir)
@@ -135,7 +140,16 @@ for doc_dir in paths:
         if not config.part_id_pattern.match(sw_file):
             logger.warning(f'File {sw_file} has invalid filename. Consider renaming it to follow the convention. '
                            f'This warning may turn into an error and crash the pipeline')
-        part = parsed_structure.get(file_name, None)
+        part: Part = parsed_structure.get(file_name, None)
         if part is None:
             continue
-        dispatcher.load(part)
+        path = []
+        next_part = part.parent
+        while next_part.parent is not None:
+            path.insert(0, next_part.part_id)
+            next_part = next_part.parent
+        path.insert(0, next_part.part_id)
+        f = dispatcher.get(part)
+        f.process(part)
+dispatcher.finalize()
+
