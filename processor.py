@@ -130,10 +130,10 @@ class PurchasePartsProcessor(JinjaLoggedProcessor):
             f.write(text)
 
 
-class LoaderDispatcher:
+class ProcessorDispatcher:
     processors: List[BaseProcessor] = []
 
-    def register(self, loader: BaseProcessor) -> LoaderDispatcher:
+    def register(self, loader: BaseProcessor) -> ProcessorDispatcher:
         self.processors.append(loader)
         return self
 

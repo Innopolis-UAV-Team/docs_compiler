@@ -12,7 +12,7 @@ from glob import glob
 import jinja2
 
 from config import Config
-from processor import LoaderDispatcher, AcceptAllProcessor, \
+from processor import ProcessorDispatcher, AcceptAllProcessor, \
     PurchasePartsProcessor
 from part import Part
 
@@ -149,7 +149,7 @@ env.lstrip_blocks = True
 env.filters['zip'] = zip
 visited = set()
 
-dispatcher = LoaderDispatcher().\
+dispatcher = ProcessorDispatcher().\
     register(PurchasePartsProcessor(env, config, fallthrough=True)).\
     register(AcceptAllProcessor(env, config))
 
