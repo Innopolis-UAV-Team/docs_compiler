@@ -8,7 +8,7 @@ services:
     container_name: docs_compiler
 
     volumes:
-      - /grabcad_repo:/grabcad_repo
+      - ${REPO_VOLUME_PATH}/grabcad_repo:/grabcad_repo
       - /compiled_docs:/compiled_docs
 
     command: "python3 main.py 
