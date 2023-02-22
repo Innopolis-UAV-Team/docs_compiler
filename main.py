@@ -39,7 +39,7 @@ parser.add_argument(
     "--part_id_metadata", help="field with part identification number in metadata",
     default='ПОЗ-я', dest='part_id_in_meta')
 parser.add_argument(
-    "--out", help="field with part identification number in metadata",
+    "--out", help="output directory for compiled docs",
     default='./docs', dest='out_path')
 parser.add_argument(
     "--docs_folder", help="name of folder with markdown files that describe each part",
@@ -117,12 +117,12 @@ for k, v in filesystem_structure.items():
 if missing_in_bom := [k[0] for k, v in filesystem_structure.items() if k[0] not in parsed_structure]:
     logger.warning(
         f'Following parts {len(missing_in_bom)} appear in file system '
-        f'but not in BOM table: {", ".join(missing_in_bom)}')
+        f'but not in BOM table: {os.linesep.join(missing_in_bom)}')
 
 if missing_in_fs := [k for k, v in parsed_structure.items() if not v.path]:
     logger.warning(
         f'Following parts {len(missing_in_fs)} appear in BOM table '
-        f'but not in file system: {", ".join(missing_in_fs)}')
+        f'but not in file system: {os.linesep.join(missing_in_fs)}')
     logger.warning(f'Virtual parts?')
 
 part_tree = Part(

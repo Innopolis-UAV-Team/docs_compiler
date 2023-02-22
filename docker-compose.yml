@@ -1,0 +1,18 @@
+version: '3.7'
+services:
+  grabcad:
+    image: docs_compiler
+    build:
+      context: .
+
+    container_name: docs_compiler
+
+    volumes:
+      - /grabcad_repo:/grabcad_repo
+      - /compiled_docs/compiled_docs
+
+    command: "python3 main.py 
+      --sw_project /grabcad_repo/${GRABCAD_REPO_NAME:-VTOL-mugin}
+      --bom_file /grabcad_repo/${GRABCAD_REPO_NAME:-VTOL-mugin}/out.json
+      --templates /grabcad_repo/${GRABCAD_REPO_NAME:-VTOL-mugin}/Template
+      --out /compiled_docs/${GRABCAD_REPO_NAME:-VTOL-mugin}/"

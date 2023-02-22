@@ -64,8 +64,13 @@ class AcceptAllProcessor(JinjaLoggedProcessor):
         super().process(part)
         file_name = os.path.splitext(part.full_name)[0]
 
-        doc_files = os.listdir(
-            os.path.join(part.path, self.config.docs_folder))
+        try:
+            doc_files = os.listdir(
+                os.path.join(part.path, self.config.docs_folder))
+        except FileNotFoundError:
+            self.logger.warning(f'File {part.full_name} does not have {self.config.docs_folder} directory on the same level.')
+            self.logger.warning('Consider creating that folder and adding up-to-date documentation')
+            return
         image_files = [
             x for x in doc_files if
             self.config.image_pattern.match(x)
