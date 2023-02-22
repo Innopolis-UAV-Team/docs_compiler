@@ -174,4 +174,3 @@ for doc_dir in paths:
         f = dispatcher.get(part)
         f.process(part)
 dispatcher.finalize()
-
